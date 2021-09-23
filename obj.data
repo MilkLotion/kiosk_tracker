@@ -1,0 +1,5 @@
+classes= 2
+train  = eyetracker/dataset/train.txt
+valid  = eyetracker/dataset/test.txt
+names = eyetracker/obj.names
+backup = eyetracker/backup/
