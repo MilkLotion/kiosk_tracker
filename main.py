@@ -2,7 +2,7 @@ import cv2
 import sys
 import time
 
-import EyeTracker_V2 as EyeTracker
+import EyeTracker as EyeTracker
 import HandTracker
 # import sendsocket
 
@@ -44,6 +44,7 @@ if __name__ == '__main__' :
 
         cv2.imshow('main', img)
 
+        #tracker test waitKey
         inputKey = cv2.waitKey(1)
         if inputKey == 27:
             break

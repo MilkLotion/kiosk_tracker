@@ -1,3 +1,5 @@
+import copy
+
 import cv2
 import numpy as np
 
@@ -29,6 +31,13 @@ class EyeT() :
 
         self.RIrisFirst = True
         self.RIrisbox = None
+
+        # 최초 아이트래커 보정
+        self.isSet = False
+        self.setCnt = 0
+        self.irisCC = [0, 0]
+        self.irisRD = [0, 0]
+        self.detectROI = None
 
     def SearchFace(self, img):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -148,7 +157,7 @@ class EyeT() :
     def get_eye_shape(self, thresh) :
         # get eye width, height
         contours, hierarchy = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-
+        val = [0, 0, 0, 0]
         # get eye rect
         unified = self.bigcnt(contours)
 
@@ -163,7 +172,7 @@ class EyeT() :
             size_array.sort(key=lambda r: r[0], reverse=True)
 
         else :
-            return
+            return val
 
         val = cv2.boundingRect(size_array[0][1])
 
@@ -173,7 +182,6 @@ class EyeT() :
         contours, hierarchy = cv2.findContours(roi, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
         cnt_area = []
-        cnt_pos = []
         for cnt in contours:
             # 중심점 좌표 구하기
             M = cv2.moments(cnt)
@@ -202,72 +210,14 @@ class EyeT() :
             return cnt_area[0][1:]
 
         else:
-            return []
-
-    def SearchIris_L(self, eyeROI) :
-        # 눈동자 추출을 위한 이미지 처리
-        eyeROIGray = cv2.cvtColor(eyeROI, cv2.COLOR_BGR2GRAY)
-        ROI_equ = cv2.equalizeHist(eyeROIGray)
-        # threshold value -> 돌릴수있는 핀(?) or 트랙바로 처리
-        _, thresh = cv2.threshold(ROI_equ, threshold_val, 255, cv2.THRESH_BINARY_INV)
-
-        if self.LIrisFirst :
-            self.LIrisbox = self.get_eye_shape(thresh)
-            self.LIrisFirst = False
-
-        Irisbox = self.LIrisbox
-
-        if Irisbox :
-            x, y, w, h = Irisbox
-
-            # self.box_w, self.box_h = thresh.shape[:2]
-
-            thresh = thresh[y:y + h, x:x + w]
-
-            cv2.imshow('eyes shape', thresh)
-
-            kernel = np.ones((7, 7), np.uint8)
-            result = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
-
-            cv2.imshow('after erode', result)
-
-            return self.getCenter(result)
-
-    def SearchIris_R(self, eyeROI):
-        # 눈동자 추출을 위한 이미지 처리
-        eyeROIGray = cv2.cvtColor(eyeROI, cv2.COLOR_BGR2GRAY)
-        ROI_equ = cv2.equalizeHist(eyeROIGray)
-        # threshold value -> 돌릴수있는 핀(?) or 트랙바로 처리
-        _, thresh = cv2.threshold(ROI_equ, threshold_val, 255, cv2.THRESH_BINARY_INV)
-
-        if self.RIrisFirst:
-            self.RIrisbox = self.get_eye_shape(thresh)
-            self.RIrisFirst = False
-
-        Irisbox = self.RIrisbox
-
-        if Irisbox:
-            x, y, w, h = Irisbox
-
-            # self.box_w, self.box_h = thresh.shape[:2]
-
-            thresh = thresh[y:y + h, x:x + w]
-
-            cv2.imshow('eyes shape', thresh)
-
-            kernel = np.ones((7, 7), np.uint8)
-            result = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
-
-            cv2.imshow('after erode', result)
-
-            return self.getCenter(result)
+            return cnt_area
 
     def makeTrackingObj(self, img, faceBox) :
         x, y, w, h = faceBox
         # cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
         faceROI = img[y:y + h, x:x + w]
-        cv2.imshow('first_face', faceROI)
+        # cv2.imshow('first_face', faceROI)
 
         # 트랙커 객체 생성 ---⑤
         self.tracker = self.trackerAlg()
@@ -285,7 +235,7 @@ class EyeT() :
             # cv2.rectangle(faceROI, (ex, ey), (ex + ew, ey + eh), (255, 0, 0), 2)
 
             eyeROI = faceROI[ey: ey + eh, ex: ex + ew]
-            cv2.imshow('firse_eye', eyeROI)
+            # cv2.imshow('firse_eye', eyeROI)
 
             # 트랙커 객체 생성 ---⑤
             self.eyetracker = self.trackerAlg()
@@ -306,7 +256,7 @@ class EyeT() :
             faceBox = list(map(int, faceBox))
             x, y, w, h = faceBox
 
-            cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            # cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
             # x < 0, y < 0, x + w > width, y + h > height -> reset
             # 얼굴이 화면을 벗어나면 초기화
             if x <= 0 or y <= 0 or x + w >= width or y + h >= height:
@@ -327,7 +277,7 @@ class EyeT() :
 
             eyesBox = list(map(int, eyesBox))
             x, y, w, h = eyesBox
-            cv2.rectangle(faceROI, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            # cv2.rectangle(faceROI, (x, y), (x + w, y + h), (255, 0, 0), 2)
             eyeROI = faceROI[y:y + h, int(x + w * 0.1): int(x + w * 0.9)]
 
             return eyeROI
@@ -339,34 +289,133 @@ class EyeT() :
             self.failCnt += 1
             return []
 
+    def get_pos_L(self, thresh) :
+        box = self.get_eye_shape(thresh)
+
+        if not box or box[0] == 0:
+            return
+
+        if self.LIrisFirst is True :
+            self.LIrisFirst = False
+            self.LIrisbox = box
+
+        if self.LIrisbox[3] > box[3] :
+            x, y, w, h = self.LIrisbox
+        else :
+            x, y, w, h = box
+
+        thresh = thresh[y:y + h, x:x + w]
+
+        cv2.imshow('thresh-left', thresh)
+
+        kernel = np.ones((7, 7), np.uint8)
+        result = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+
+        return self.getCenter(result)
+
+    def get_pos_R(self, thresh) :
+        box = self.get_eye_shape(thresh)
+
+        if not box or box[0] == 0:
+            return
+
+        if self.RIrisFirst is True :
+            self.RIrisFirst = False
+            self.RIrisbox = box
+
+        if self.RIrisbox[3] > box[3] :
+            x, y, w, h = self.RIrisbox
+        else :
+            x, y, w, h = box
+
+        thresh = thresh[y:y + h, x:x + w]
+
+        cv2.imshow('thresh-right', thresh)
+
+        kernel = np.ones((9, 9), np.uint8)
+        result = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+
+        cv2.imshow('thresh-right after open', result)
+
+        return self.getCenter(result)
+
+    def setting(self, now) :
+        # 이전 위치와 현재위치의 차이가 적으면 움직임이 없다
+        # 오른쪽 아래를 일정시간 이상 응시하면 세팅완료
+
+        # 일정시간 초과하여 세팅값 저장
+        if self.setCnt > 20 :
+            self.irisRD = now
+            self.detectROI = np.zeros(shape=((self.irisRD[0] - self.irisCC[0]) * 2, (self.irisRD[1] - self.irisCC[1]) * 2),
+                                 dtype=np.int8)
+            self.isSet = True
+
+        elif self.setCnt == 0 :
+            self.irisCC = now
+
+        # 이전과 현재의 차이가 적으면 움직임이 없는것으로 판단
+        if -4 < self.irisRD[0] - now[0] < 4 and -2 < self.irisRD[1] - now[1] < 2 :
+            self.setCnt += 1
+        # 차이가 많으면 초기화
+        else:
+            self.irisRD = now
+            self.setCnt = 1
+
+    def DetectMove(self, pos) :
+        width, height = self.detectROI.shape
+        move = []
+
+        if pos[0] > width/2 :
+            move.append('r')
+        else :
+            move.append('l')
+
+        if pos[1] > height/2 :
+            move.append('d')
+        else :
+            move.append('u')
+
+        return move
+
     def trackingIris(self, eyeROI):
         height, width, _ = eyeROI.shape
         pos = []
 
-        roi_left = eyeROI[0: height, 0: width // 2]
-        roi_right = eyeROI[0: height, width // 2: width]
+        eyeROIGray = cv2.cvtColor(eyeROI, cv2.COLOR_BGR2GRAY)
+        ROI_equ = cv2.equalizeHist(eyeROIGray)
+        # threshold value -> 돌릴수있는 핀(?) or 트랙바로 처리
+        _, thresh = cv2.threshold(ROI_equ, threshold_val, 255, cv2.THRESH_BINARY_INV)
 
-        left_pos = self.SearchIris_L(roi_left)
-        right_pos = self.SearchIris_R(roi_right)
+        # thresh_left = thresh[0: height, 0: width // 2]
+        # thresh_right = thresh[0: height, width // 2: width]
+        #
+        # left_pos = self.get_pos_L(thresh_left)
+        # right_pos = self.get_pos_R(thresh_right)
+        #
+        # if right_pos and left_pos :
+        #     left_pos = list(map(int, left_pos))
+        #     right_pos = list(map(int, right_pos))
+        #
+        #     pos = [int((left_pos[0] + right_pos[0])/2), int((left_pos[1] + right_pos[1])/2)]
 
-        if left_pos is not None and len(left_pos) != 0  :
-            left_pos = list(map(int, left_pos))
-            cv2.circle(roi_left, left_pos, 3, (255, 0, 0), -1)
+        thresh_right = thresh[0: height, width // 2: width]
 
-        if right_pos is not None and len(right_pos) != 0 :
+        right_pos = self.get_pos_R(thresh_right)
+
+        if right_pos :
             right_pos = list(map(int, right_pos))
-            cv2.circle(roi_right, right_pos, 3, (255, 0, 0), -1)
 
-        # 오,왼 평균 좌표
+            pos = right_pos
+
         return pos
 
 
     def Reset(self) :
         EyeT.__init__(self)
-        # cv2.destroyAllWindows()
+        cv2.destroyAllWindows()
 
     def main(self, img) :
-        # face search
+        sendmsg = ""
         if self.isFirst is True :
             faceBox = self.SearchFace(img)
 
@@ -385,7 +434,19 @@ class EyeT() :
                 eyeROI = self.trackingEyes(faceROI)
 
                 if len(eyeROI) != 0 :
-                    pos = self.trackingIris(eyeROI)
+                    center_pos = self.trackingIris(eyeROI)
+
+                    if len(center_pos) != 0 :
+                        if self.isSet is False:
+                            self.setting(center_pos)
+                            cv2.putText(img, "see right_under", (10, 110), cv2.FONT_HERSHEY_COMPLEX, img.shape[1] / 500,
+                                        (0, 0, 255), 2)
+                        else:
+                            # 좌표에 따른 움직임 감지
+                            sendmsg = self.DetectMove(center_pos)
+                            cv2.putText(img, str(sendmsg), (10, 110), cv2.FONT_HERSHEY_COMPLEX, img.shape[1] / 500,
+                                        (0, 0, 255), 2)
 
             else :
                 self.Reset()
+        return sendmsg
