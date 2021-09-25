@@ -37,6 +37,7 @@ class EyeT() :
         self.setCnt = 0
         self.irisCC = [0, 0]
         self.irisRD = [0, 0]
+        self.RDList = np.empty((0,2))
         self.detectROI = None
 
     def SearchFace(self, img):
@@ -295,10 +296,12 @@ class EyeT() :
         if not box or box[0] == 0:
             return
 
+        # first execute check
         if self.LIrisFirst is True :
             self.LIrisFirst = False
             self.LIrisbox = box
 
+        # fix box size
         if self.LIrisbox[3] > box[3] :
             x, y, w, h = self.LIrisbox
         else :
@@ -308,7 +311,7 @@ class EyeT() :
 
         cv2.imshow('thresh-left', thresh)
 
-        kernel = np.ones((7, 7), np.uint8)
+        kernel = np.ones((9, 9), np.uint8)
         result = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
 
         return self.getCenter(result)
@@ -344,11 +347,18 @@ class EyeT() :
         # 오른쪽 아래를 일정시간 이상 응시하면 세팅완료
 
         # 일정시간 초과하여 세팅값 저장
-        if self.setCnt > 20 :
-            self.irisRD = now
-            self.detectROI = np.zeros(shape=((self.irisRD[0] - self.irisCC[0]) * 2, (self.irisRD[1] - self.irisCC[1]) * 2),
-                                 dtype=np.int8)
+        if self.setCnt > 10 :
+            # list average, axis=0 -> column average
+            self.irisRD = np.mean(self.RDList, axis=0, dtype=np.int64)
+            # self.irisRD = list(map(int, self.irisRD))
+
             self.isSet = True
+
+            if self.irisRD[0] > self.irisCC[0] and self.irisRD[1] > self.irisCC[1] :
+                self.detectROI = np.zeros(shape=((self.irisRD[0] - self.irisCC[0]) * 2, (self.irisRD[1] - self.irisCC[1]) * 2),
+                                 dtype=np.int8)
+            else :
+                self.Reset()
 
         elif self.setCnt == 0 :
             self.irisCC = now
@@ -356,6 +366,7 @@ class EyeT() :
         # 이전과 현재의 차이가 적으면 움직임이 없는것으로 판단
         if -4 < self.irisRD[0] - now[0] < 4 and -2 < self.irisRD[1] - now[1] < 2 :
             self.setCnt += 1
+            self.RDList = np.append(self.RDList, np.array([now]), axis=0)
         # 차이가 많으면 초기화
         else:
             self.irisRD = now
@@ -377,7 +388,8 @@ class EyeT() :
 
         return move
 
-    def trackingIris(self, eyeROI):
+    def trackingIris(self, eyeROI) :
+        eyeROI = cv2.resize(eyeROI, dsize=(0, 0), fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
         height, width, _ = eyeROI.shape
         pos = []
 
@@ -386,26 +398,27 @@ class EyeT() :
         # threshold value -> 돌릴수있는 핀(?) or 트랙바로 처리
         _, thresh = cv2.threshold(ROI_equ, threshold_val, 255, cv2.THRESH_BINARY_INV)
 
-        # thresh_left = thresh[0: height, 0: width // 2]
-        # thresh_right = thresh[0: height, width // 2: width]
-        #
-        # left_pos = self.get_pos_L(thresh_left)
-        # right_pos = self.get_pos_R(thresh_right)
-        #
-        # if right_pos and left_pos :
-        #     left_pos = list(map(int, left_pos))
-        #     right_pos = list(map(int, right_pos))
-        #
-        #     pos = [int((left_pos[0] + right_pos[0])/2), int((left_pos[1] + right_pos[1])/2)]
-
+        thresh_left = thresh[0: height, 0: width // 2]
         thresh_right = thresh[0: height, width // 2: width]
 
+        left_pos = self.get_pos_L(thresh_left)
         right_pos = self.get_pos_R(thresh_right)
 
-        if right_pos :
+        if right_pos and left_pos :
+            left_pos = list(map(int, left_pos))
             right_pos = list(map(int, right_pos))
 
-            pos = right_pos
+            pos = [int((left_pos[0] + right_pos[0])/2), int((left_pos[1] + right_pos[1])/2)]
+
+        # only right sight test
+        # thresh_right = thresh[0: height, width // 2: width]
+        #
+        # right_pos = self.get_pos_R(thresh_right)
+        #
+        # if right_pos :
+        #     right_pos = list(map(int, right_pos))
+        #
+        #     pos = right_pos
 
         return pos
 
