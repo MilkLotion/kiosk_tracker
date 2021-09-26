@@ -4,4 +4,4 @@ sudo apt-get upgrade
 sudo apt-get update
 pip install -r requirements.txt
 # client system execute
-python3 main.py;
+python3 main_tracker.py;
