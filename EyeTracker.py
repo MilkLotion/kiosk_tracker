@@ -340,7 +340,7 @@ class EyeT() :
         else :
             x, y, w, h = box
 
-        if box[3] > self.LIrisbox[3] :
+        if box[3] > self.RIrisbox[3] :
             if self.upsig :
                 self.upsig = True
             else :
