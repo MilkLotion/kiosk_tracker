@@ -496,5 +496,6 @@ class EyeT() :
 
             else :
                 self.Reset()
+                sendmsg = "fail"
 
         return sendmsg
