@@ -32,7 +32,6 @@ if __name__ == '__main__' :
 
         # center -> detect face 3sec -> click -> right under -> click -> main
         #        -> detect fail -> suspend    //             -> detect fail -> center ...
-        # mouseHandler(handmsg)
         if eyemsg is not None and eyemsg != "":
             print(eyemsg)
 

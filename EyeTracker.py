@@ -44,6 +44,8 @@ class EyeT() :
         self.detectUD = "u"
         self.upsig = False
 
+        self.escapeET = 0
+
     def SearchFace(self, img):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         # 얼굴 탐색
@@ -465,7 +467,9 @@ class EyeT() :
 
             if len(faceBox) != 4:
                 # print('cannot search Face !!!')
-                return
+                self.Reset()
+                return sendmsg # print test
+                # sendmsg = "fail"
 
             if self.faceCount > 30 :
                 self.makeTrackingObj(img, faceBox)
@@ -483,6 +487,7 @@ class EyeT() :
 
                     if len(center_pos) != 0 :
                         if self.isSet is True:
+                            self.escapeET = 0
                             # 좌표에 따른 움직임 감지
                             sendmsg = self.DetectMove(center_pos)
                             cv2.putText(img, str(sendmsg), (10, 110), cv2.FONT_HERSHEY_COMPLEX, img.shape[1] / 500,
@@ -494,6 +499,15 @@ class EyeT() :
                             if self.isSet is True :
                                 sendmsg = "click"
 
+                            self.escapeET += 1
+
+                            if self.escapeET > 70:
+                                self.Reset()
+                                sendmsg = "fail"
+                    else :
+                        self.escapeET += 1
+                else :
+                    self.escapeET += 1
             else :
                 self.Reset()
                 sendmsg = "fail"
