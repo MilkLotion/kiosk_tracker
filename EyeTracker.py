@@ -38,7 +38,11 @@ class EyeT() :
         self.irisCC = [0, 0]
         self.irisRD = [0, 0]
         self.RDList = np.empty((0,2))
+        # cc to rd size roi
         self.detectROI = None
+        self.detectLR = "l"
+        self.detectUD = "u"
+        self.upsig = False
 
     def SearchFace(self, img):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -235,7 +239,7 @@ class EyeT() :
             ex, ey, ew, eh = eyeBox
             # cv2.rectangle(faceROI, (ex, ey), (ex + ew, ey + eh), (255, 0, 0), 2)
 
-            eyeROI = faceROI[ey: ey + eh, ex: ex + ew]
+            # eyeROI = faceROI[ey: ey + eh, ex: ex + ew]
             # cv2.imshow('firse_eye', eyeROI)
 
             # 트랙커 객체 생성 ---⑤
@@ -246,7 +250,7 @@ class EyeT() :
             if eye_isInit is True :
                 self.isFirst = False
             else :
-                print('Cannot find Eyes')
+                # print('Cannot find Eyes')
                 self.Reset()
 
     def trackingFace(self, img) :
@@ -261,13 +265,13 @@ class EyeT() :
             # x < 0, y < 0, x + w > width, y + h > height -> reset
             # 얼굴이 화면을 벗어나면 초기화
             if x <= 0 or y <= 0 or x + w >= width or y + h >= height:
-                print("ROI is escape from cam!!!")
+                # print("ROI is escape from cam!!!")
                 return []
             else:
                 faceROI = img[y:y + h, x:x + w]
                 return faceROI
         else :
-            print('Face Tracking Fail !!!')
+            # print('Face Tracking Fail !!!')
             return []
 
     def trackingEyes(self, faceROI) :
@@ -285,7 +289,7 @@ class EyeT() :
 
         else :
             if self.failCnt > 10 :
-                print('Fail Eyes ROI Tracking!!!')
+                # print('Fail Eyes ROI Tracking!!!')
                 self.Reset()
             self.failCnt += 1
             return []
@@ -302,19 +306,24 @@ class EyeT() :
             self.LIrisbox = box
 
         # fix box size
-        if self.LIrisbox[3] > box[3] :
+        if self.LIrisbox[2] > box[2] :
             x, y, w, h = self.LIrisbox
         else :
             x, y, w, h = box
 
+        if box[3] > self.LIrisbox[3] :
+            self.upsig = True
+
         thresh = thresh[y:y + h, x:x + w]
 
-        cv2.imshow('thresh-left', thresh)
+        # cv2.imshow('thresh-left', thresh)
 
         kernel = np.ones((9, 9), np.uint8)
         result = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
 
-        return self.getCenter(result)
+        pos = self.getCenter(result)
+
+        return pos
 
     def get_pos_R(self, thresh) :
         box = self.get_eye_shape(thresh)
@@ -326,21 +335,28 @@ class EyeT() :
             self.RIrisFirst = False
             self.RIrisbox = box
 
-        if self.RIrisbox[3] > box[3] :
+        if self.RIrisbox[2] > box[2] :
             x, y, w, h = self.RIrisbox
         else :
             x, y, w, h = box
 
+        if box[3] > self.LIrisbox[3] :
+            if self.upsig :
+                self.upsig = True
+            else :
+                self.upsig = False
+
         thresh = thresh[y:y + h, x:x + w]
 
-        cv2.imshow('thresh-right', thresh)
+        # cv2.imshow('thresh-right', thresh)
 
         kernel = np.ones((9, 9), np.uint8)
         result = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
 
-        cv2.imshow('thresh-right after open', result)
+        # cv2.imshow('thresh-right after open', result)
+        pos = self.getCenter(result)
 
-        return self.getCenter(result)
+        return pos
 
     def setting(self, now) :
         # 이전 위치와 현재위치의 차이가 적으면 움직임이 없다
@@ -350,7 +366,6 @@ class EyeT() :
         if self.setCnt > 10 :
             # list average, axis=0 -> column average
             self.irisRD = np.mean(self.RDList, axis=0, dtype=np.int64)
-            # self.irisRD = list(map(int, self.irisRD))
 
             self.isSet = True
 
@@ -374,22 +389,38 @@ class EyeT() :
 
     def DetectMove(self, pos) :
         width, height = self.detectROI.shape
-        move = []
+        move = ""
 
-        if pos[0] > width/2 :
-            move.append('r')
-        else :
-            move.append('l')
+        print(self.detectROI.shape)
+        print(pos)
 
-        if pos[1] > height/2 :
-            move.append('d')
+        optimR = width/2 + width*0.05
+        optimL = width/2 - width*0.05
+        optimD = height/2 + height*0.025
+        optimU = height/2 - height*0.025
+
+        if pos[0] > optimR :
+            self.detectLR = "r"
+        elif pos[0] < optimL :
+            self.detectLR = "l"
         else :
-            move.append('u')
+            pass
+
+        if pos[1] > optimD :
+            self.detectUD = "d"
+        elif pos[1] < optimU :
+            self.detectUD = "u"
+        elif self.upsig :
+            self.detectUD = "u"
+        else :
+            pass
+
+        move = self.detectLR + self.detectUD
 
         return move
 
     def trackingIris(self, eyeROI) :
-        eyeROI = cv2.resize(eyeROI, dsize=(0, 0), fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
+        eyeROI = cv2.resize(eyeROI, dsize=(0, 0), fx=3, fy=3, interpolation=cv2.INTER_LINEAR)
         height, width, _ = eyeROI.shape
         pos = []
 
@@ -433,11 +464,12 @@ class EyeT() :
             faceBox = self.SearchFace(img)
 
             if len(faceBox) != 4:
-                print('cannot search Face !!!')
+                # print('cannot search Face !!!')
                 return
 
             if self.faceCount > 30 :
                 self.makeTrackingObj(img, faceBox)
+                sendmsg = "click"
 
             self.faceCount += 1
 
@@ -450,16 +482,19 @@ class EyeT() :
                     center_pos = self.trackingIris(eyeROI)
 
                     if len(center_pos) != 0 :
-                        if self.isSet is False:
-                            self.setting(center_pos)
-                            cv2.putText(img, "see right_under", (10, 110), cv2.FONT_HERSHEY_COMPLEX, img.shape[1] / 500,
-                                        (0, 0, 255), 2)
-                        else:
+                        if self.isSet is True:
                             # 좌표에 따른 움직임 감지
                             sendmsg = self.DetectMove(center_pos)
                             cv2.putText(img, str(sendmsg), (10, 110), cv2.FONT_HERSHEY_COMPLEX, img.shape[1] / 500,
                                         (0, 0, 255), 2)
+                        else :
+                            self.setting(center_pos)
+                            cv2.putText(img, "see right_under", (10, 110), cv2.FONT_HERSHEY_COMPLEX, img.shape[1] / 500,
+                                        (0, 0, 255), 2)
+                            if self.isSet is True :
+                                sendmsg = "click"
 
             else :
                 self.Reset()
+
         return sendmsg

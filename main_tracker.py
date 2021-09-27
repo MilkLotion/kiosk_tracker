@@ -2,13 +2,13 @@ import cv2
 import sys
 import time
 
-import EyeTracker as EyeTracker
-import HandTracker
+import EyeTracker
+# import HandTracker
 # import sendsocket
 
 if __name__ == '__main__' :
     eyeT = EyeTracker.EyeT()
-    handT = HandTracker.HandT()
+    # handT = HandTracker.HandT()
     # send = sendsocket.sendS()
 
     cap = cv2.VideoCapture(0)
@@ -28,9 +28,15 @@ if __name__ == '__main__' :
             break
 
         eyemsg = eyeT.main(img)
-        handmsg = handT.main(img)
+        # handmsg = handT.main(img)
 
-        sndmsg = str(eyemsg) + str(handmsg)
+        # center -> detect face 3sec -> click -> right under -> click -> main
+        #        -> detect fail -> suspend    //             -> detect fail -> center ...
+        # mouseHandler(handmsg)
+        if eyemsg is not None and eyemsg != "":
+            print(eyemsg)
+
+        # sndmsg = str(eyemsg) + str(handmsg)
 
         # send.send(sndmsg)
 

@@ -1,6 +1,12 @@
+pip
 dlib
 imutils
 numpy
 opencv-python
 opencv-contrib-python
+mediapipe
 scipy
+pyzbar
+pyqt5
+pyinstaller
+firebase_admin
